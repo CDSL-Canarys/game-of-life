@@ -2,12 +2,16 @@ name: Java CI with Maven
 
 on:
   workflow_dispatch:
+  # push:
+  #   branches: [ main ]
+  # pull_request:
+  #   branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Setup Java JDK
       uses: actions/setup-java@v5.0.0
@@ -16,11 +20,112 @@ jobs:
         distribution: 'temurin'
         cache: 'maven'
     
-    - name: Compile
-      run: ./mvnw -B compile --file pom.xml
-    
-    - name: Test
-      run: ./mvnw -B test --file pom.xml
-    
     - name: Build with Maven
       run: ./mvnw -B package --file pom.xml
+    
+    - name: Upload artifact for deployment job
+      uses: actions/upload-artifact@v4
+      with:
+        name: java-app
+        path: target/*.jar
+    
+    - name: Setup JFrog CLI
+      uses: jfrog/setup-jfrog-cli@v4
+      env:
+        JF_URL: ${{ secrets.JF_URL }}
+        JF_USER: ${{ secrets.JF_USER }}
+        JF_PASSWORD: ${{ secrets.JF_PASSWORD }}
+    
+    - name: Upload to Artifactory
+      run: |
+        jfrog rt upload "target/*.jar" "libs-release-local/com/example/petclinic/${{ github.run_number }}/" --build-name=petclinic --build-number=${{ github.run_number }}
+    
+    - name: Publish build info
+      run: |
+        jfrog rt build-publish petclinic ${{ github.run_number }}
+
+  sonar-scan:
+    name: Build and analyze
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v6.0.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: SonarQube Quality Gate check
+        id: sonarqube-quality-gate-check
+        uses: sonarsource/sonarqube-quality-gate-action@v1.2.0
+        with:
+          pollingTimeoutSec: 600
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }} 
+  
+  codeql:
+    name: CodeQL Security Scanning
+    runs-on: ubuntu-latest
+    needs: sonar-scan
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'java' ]
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+    
+    - name: Setup Java JDK
+      uses: actions/setup-java@v5.0.0
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: 'maven'
+    
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v4
+      with:
+        languages: ${{ matrix.language }}
+    
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v4
+    
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v4
+      with:
+        category: "/language:${{matrix.language}}"
+
+  deploy:
+    name: Deploy to Azure App Service
+    runs-on: ubuntu-latest
+    needs: [build, sonar-scan, codeql]
+    environment:
+      name: production
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+    steps:
+    - name: Setup JFrog CLI
+      uses: jfrog/setup-jfrog-cli@v4
+      env:
+        JF_URL: ${{ secrets.JF_URL }}
+        JF_USER: ${{ secrets.JF_USER }}
+        JF_PASSWORD: ${{ secrets.JF_PASSWORD }}
+    
+    - name: Download artifact from JFrog
+      run: |
+        jfrog rt download "libs-release-local/com/example/petclinic/${{ github.run_number }}/*.jar" ./artifacts/
+    
+    - name: Deploy to Azure Web App
+      id: deploy-to-webapp
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: 'artifacts/*.jar'

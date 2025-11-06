@@ -44,7 +44,12 @@ jobs:
           fetch-depth: 0
 
       - name: Sonar Maven Scan
-        run: mvn verify sonar:sonar -Dsonar.projectKey=CDSL-Canarys_game-of-life -Dsonar.organization=cdsl-canarys -Dsonar.host.url=https://sonarcloud.io
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: mvn verify sonar:sonar \
+              -Dsonar.projectKey=CDSL-Canarys_game-of-life \
+              -Dsonar.organization=cdsl-canarys \
+              -Dsonar.host.url=https://sonarcloud.io
 
       # - name: SonarQube Scan
       #   uses: sonarsource/sonarqube-scan-action@v6.0.0

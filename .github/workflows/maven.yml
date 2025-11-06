@@ -52,16 +52,21 @@ jobs:
         uses: sonarsource/sonarqube-scan-action@v6.0.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=CDSL-Canarys_game-of-life
+            -Dsonar.organization=cdsl-canarys
 
       - name: SonarQube Quality Gate check
         id: sonarqube-quality-gate-check
         uses: sonarsource/sonarqube-quality-gate-action@v1.2.0
         with:
           pollingTimeoutSec: 600
+          args: >
+            -Dsonar.projectKey=CDSL-Canarys_game-of-life
+            -Dsonar.organization=cdsl-canarys 
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }} 
   
   codeql:
     name: CodeQL Security Scanning

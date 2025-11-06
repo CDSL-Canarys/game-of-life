@@ -63,16 +63,14 @@ jobs:
       #       -Dsonar.projectKey=CDSL-Canarys_game-of-life
       #       -Dsonar.organization=cdsl-canarys
 
-      # - name: SonarQube Quality Gate check
-      #   id: sonarqube-quality-gate-check
-      #   uses: sonarsource/sonarqube-quality-gate-action@v1.2.0
-      #   with:
-      #     pollingTimeoutSec: 600
-      #     args: >
-      #       -Dsonar.projectKey=CDSL-Canarys_game-of-life
-      #       -Dsonar.organization=cdsl-canarys 
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: SonarQube Quality Gate Check
+        id: sonarqube-quality-gate-check
+        uses: sonarsource/sonarqube-quality-gate-action@v1.2.0
+        with:
+          pollingTimeoutSec: 600
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
   
   codeql:
     name: CodeQL Security Scanning

@@ -36,13 +36,9 @@ jobs:
         JF_USER: ${{ secrets.JF_USER }}
         JF_PASSWORD: ${{ secrets.JF_PASSWORD }}
     
-    - name: Upload to Artifactory
+    - name: Upload to JFrog Artifactory
       run: |
-        jfrog rt upload "target/*.jar" "libs-release-local/com/example/petclinic/${{ github.run_number }}/" --build-name=petclinic --build-number=${{ github.run_number }}
-    
-    - name: Publish build info
-      run: |
-        jfrog rt build-publish petclinic ${{ github.run_number }}
+        jfrog rt upload "target/*.jar" "gol/${{ github.run_number }}/" --build-name=petclinic --build-number=${{ github.run_number }}
 
   sonar-scan:
     name: Build and analyze
@@ -95,8 +91,8 @@ jobs:
       with:
         languages: ${{ matrix.language }}
     
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v4
+    - name: Build with Maven
+      run: ./mvnw -B package -DskipTests
     
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
@@ -108,7 +104,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build, sonar-scan, codeql]
     environment:
-      name: production
+      name: Develop
       url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
     steps:
     - name: Setup JFrog CLI
@@ -117,10 +113,13 @@ jobs:
         JF_URL: ${{ secrets.JF_URL }}
         JF_USER: ${{ secrets.JF_USER }}
         JF_PASSWORD: ${{ secrets.JF_PASSWORD }}
+      with:
+        disable-auto-build-publish: true
+        disable-job-summary: true
     
     - name: Download artifact from JFrog
       run: |
-        jfrog rt download "libs-release-local/com/example/petclinic/${{ github.run_number }}/*.jar" ./artifacts/
+        jfrog rt download "gol/${{ github.run_number }}/*.jar" ./artifacts/ --flat
     
     - name: Deploy to Azure Web App
       id: deploy-to-webapp

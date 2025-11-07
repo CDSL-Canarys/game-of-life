@@ -103,7 +103,8 @@ jobs:
     runs-on: ubuntu-latest
     # needs: [build, sonar-scan, codeql]
     needs: [build]
-    environment: DEV
+    if: ${{ inputs.deploy_environment == 'DEV'}}
+    environment: ${{ inputs.deploy_environment }}
     steps:
     - name: Setup JFrog CLI
       uses: jfrog/setup-jfrog-cli@v4
@@ -137,8 +138,9 @@ jobs:
 
   deploy-to-uat:
     runs-on: ubuntu-latest
-    needs: [deploy-to-dev]
-    environment: UAT
+    needs: [build]
+    if: ${{ inputs.deploy_environment == 'UAT'}}
+    environment: ${{ inputs.deploy_environment }}
     steps:
     - name: Setup JFrog CLI
       uses: jfrog/setup-jfrog-cli@v4
@@ -178,8 +180,9 @@ jobs:
 
   deploy-to-mock:
     runs-on: ubuntu-latest
-    needs: [deploy-to-uat]
-    environment: MOCK
+    needs: build
+    if: ${{ inputs.deploy_environment == 'MOCK'}}
+    environment: ${{ inputs.deploy_environment }}
     steps:
     - name: Setup JFrog CLI
       uses: jfrog/setup-jfrog-cli@v4
@@ -201,6 +204,7 @@ jobs:
       with:
         app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        slot-name: mock
         package: 'artifacts/*.jar'
     
     - name: Display Deployment URL
@@ -218,8 +222,9 @@ jobs:
 
   deploy-to-clean-room:
     runs-on: ubuntu-latest
-    needs: [deploy-to-mock]
-    environment: CLEAN_ROOM
+    needs: build
+    if: ${{ inputs.deploy_environment == 'CLEAN-ROOM'}}
+    environment: ${{ inputs.deploy_environment }}
     steps:
     - name: Setup JFrog CLI
       uses: jfrog/setup-jfrog-cli@v4
@@ -252,8 +257,9 @@ jobs:
 
   deploy-to-prod:
     runs-on: ubuntu-latest
-    needs: [deploy-to-clean-room]
-    environment: PROD
+    needs: build
+    if: ${{ inputs.deploy_environment == 'PROD'}}
+    environment: ${{ inputs.deploy_environment }}
     steps:
     - name: Setup JFrog CLI
       uses: jfrog/setup-jfrog-cli@v4
@@ -286,8 +292,9 @@ jobs:
 
   deploy-to-dr:
     runs-on: ubuntu-latest
-    needs: [deploy-to-prod]
-    environment: DR
+    needs: build
+    if: ${{ inputs.deploy_environment == 'DR'}}
+    environment: ${{ inputs.deploy_environment }}
     steps:
     - name: Setup JFrog CLI
       uses: jfrog/setup-jfrog-cli@v4

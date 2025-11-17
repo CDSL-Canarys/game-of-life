@@ -19,17 +19,6 @@ jobs:
     
     - name: Build with Maven
       run: ./mvnw -B package --file pom.xml
-    
-    - name: Setup JFrog CLI
-      uses: jfrog/setup-jfrog-cli@v4
-      env:
-        JF_URL: ${{ secrets.JF_URL }}
-        JF_USER: ${{ secrets.JF_USER }}
-        JF_PASSWORD: ${{ secrets.JF_PASSWORD }}
-    
-    # - name: Upload to JFrog Artifactory
-    #   run: |
-    #     jfrog rt upload "target/*.jar" "gol/${{ github.run_number }}/" --build-name=petclinic --build-number=${{ github.run_number }}
 
   sonar-scan:
     name: Build and analyze
@@ -39,6 +28,14 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
 
       - name: Sonar Maven Scan
         env:

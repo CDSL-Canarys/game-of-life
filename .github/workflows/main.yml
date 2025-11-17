@@ -1,0 +1,318 @@
+name: Java CI with Maven
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    
+    - name: Setup Java JDK
+      uses: actions/setup-java@v5.0.0
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: 'maven'
+    
+    - name: Build with Maven
+      run: ./mvnw -B package --file pom.xml
+    
+    - name: Setup JFrog CLI
+      uses: jfrog/setup-jfrog-cli@v4
+      env:
+        JF_URL: ${{ secrets.JF_URL }}
+        JF_USER: ${{ secrets.JF_USER }}
+        JF_PASSWORD: ${{ secrets.JF_PASSWORD }}
+    
+    - name: Upload to JFrog Artifactory
+      run: |
+        jfrog rt upload "target/*.jar" "gol/${{ github.run_number }}/" --build-name=petclinic --build-number=${{ github.run_number }}
+
+  # sonar-scan:
+  #   name: Build and analyze
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #       with:
+  #         fetch-depth: 0
+
+  #     - name: Sonar Maven Scan
+  #       env:
+  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  #       run: |
+  #         mvn verify sonar:sonar \
+  #           -Dsonar.projectKey=CDSL-Canarys_game-of-life \
+  #           -Dsonar.organization=cdsl-canarys \
+  #           -Dsonar.host.url=https://sonarcloud.io \
+  #           -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+  # codeql:
+  #   name: CodeQL Security Scanning
+  #   runs-on: ubuntu-latest
+  #   needs: sonar-scan
+  #   permissions:
+  #     actions: read
+  #     contents: read
+  #     security-events: write
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       language: [ 'java' ]
+  #   steps:
+  #   - name: Checkout repository
+  #     uses: actions/checkout@v5
+    
+  #   - name: Setup Java JDK
+  #     uses: actions/setup-java@v5.0.0
+  #     with:
+  #       java-version: '17'
+  #       distribution: 'temurin'
+  #       cache: 'maven'
+    
+  #   - name: Initialize CodeQL
+  #     uses: github/codeql-action/init@v4
+  #     with:
+  #       languages: ${{ matrix.language }}
+    
+  #   - name: Build with Maven
+  #     run: ./mvnw -B package -DskipTests
+    
+  #   - name: Perform CodeQL Analysis
+  #     uses: github/codeql-action/analyze@v4
+  #     with:
+  #       category: "/language:${{matrix.language}}"
+
+  deploy-to-dev:
+    runs-on: ubuntu-latest
+    # needs: [build, sonar-scan, codeql]
+    needs: [build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: DEV
+    steps:
+    - name: Setup JFrog CLI
+      uses: jfrog/setup-jfrog-cli@v4
+      env:
+        JF_URL: ${{ secrets.JF_URL }}
+        JF_USER: ${{ secrets.JF_USER }}
+        JF_PASSWORD: ${{ secrets.JF_PASSWORD }}
+      with:
+        disable-auto-build-publish: true
+        disable-job-summary: true
+    
+    - name: Download artifact from JFrog
+      run: |
+        jfrog rt download "gol/${{ github.run_number }}/*.jar" ./artifacts/ --flat
+    
+    - name: Deploy to Azure Web App
+      id: deploy-to-webapp
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        slot-name: dev
+        package: 'artifacts/*.jar'
+    
+    - name: Display Deployment URL
+      run: |
+        echo "::notice title=Deployment URL::Application deployed to ${{ steps.deploy-to-webapp.outputs.webapp-url }}"
+        echo "### 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ inputs.deploy_environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**URL:** ${{ steps.deploy-to-webapp.outputs.webapp-url }}" >> $GITHUB_STEP_SUMMARY
+
+  deploy-to-uat:
+    runs-on: ubuntu-latest
+    needs: [deploy-to-dev]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: UAT
+    steps:
+    - name: Setup JFrog CLI
+      uses: jfrog/setup-jfrog-cli@v4
+      env:
+        JF_URL: ${{ secrets.JF_URL }}
+        JF_USER: ${{ secrets.JF_USER }}
+        JF_PASSWORD: ${{ secrets.JF_PASSWORD }}
+      with:
+        disable-auto-build-publish: true
+        disable-job-summary: true
+    
+    - name: Download artifact from JFrog
+      run: |
+        jfrog rt download "gol/${{ github.run_number }}/*.jar" ./artifacts/ --flat
+    
+    - name: Deploy to Azure Web App
+      id: deploy-to-webapp
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        slot-name: uat
+        package: 'artifacts/*.jar'
+    
+    - name: Display Deployment URL
+      run: |
+        echo "::notice title=Deployment URL::Application deployed to ${{ steps.deploy-to-webapp.outputs.webapp-url }}"
+        echo "### 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ inputs.deploy_environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**URL:** ${{ steps.deploy-to-webapp.outputs.webapp-url }}" >> $GITHUB_STEP_SUMMARY
+
+    - name: Automation Test
+      run: sleep 15
+
+    - name: Burp Suite DAST
+      run: sleep 15
+
+  deploy-to-mock:
+    runs-on: ubuntu-latest
+    needs: deploy-to-uat
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: MOCK
+    steps:
+    - name: Setup JFrog CLI
+      uses: jfrog/setup-jfrog-cli@v4
+      env:
+        JF_URL: ${{ secrets.JF_URL }}
+        JF_USER: ${{ secrets.JF_USER }}
+        JF_PASSWORD: ${{ secrets.JF_PASSWORD }}
+      with:
+        disable-auto-build-publish: true
+        disable-job-summary: true
+    
+    - name: Download artifact from JFrog
+      run: |
+        jfrog rt download "gol/${{ github.run_number }}/*.jar" ./artifacts/ --flat
+    
+    - name: Deploy to Azure Web App
+      id: deploy-to-webapp
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        slot-name: mock
+        package: 'artifacts/*.jar'
+    
+    - name: Display Deployment URL
+      run: |
+        echo "::notice title=Deployment URL::Application deployed to ${{ steps.deploy-to-webapp.outputs.webapp-url }}"
+        echo "### 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ inputs.deploy_environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**URL:** ${{ steps.deploy-to-webapp.outputs.webapp-url }}" >> $GITHUB_STEP_SUMMARY
+
+    - name: Load Testing
+      run: sleep 15
+
+    - name: Performance Testing
+      run: sleep 15
+
+  deploy-to-clean-room:
+    runs-on: ubuntu-latest
+    needs: deploy-to-mock
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: CLEAN-ROOM
+    steps:
+    - name: Setup JFrog CLI
+      uses: jfrog/setup-jfrog-cli@v4
+      env:
+        JF_URL: ${{ secrets.JF_URL }}
+        JF_USER: ${{ secrets.JF_USER }}
+        JF_PASSWORD: ${{ secrets.JF_PASSWORD }}
+      with:
+        disable-auto-build-publish: true
+        disable-job-summary: true
+    
+    - name: Download artifact from JFrog
+      run: |
+        jfrog rt download "gol/${{ github.run_number }}/*.jar" ./artifacts/ --flat
+    
+    - name: Deploy to Azure Web App
+      id: deploy-to-webapp
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        slot-name: clean-room
+        package: 'artifacts/*.jar'
+    
+    - name: Display Deployment URL
+      run: |
+        echo "::notice title=Deployment URL::Application deployed to ${{ steps.deploy-to-webapp.outputs.webapp-url }}"
+        echo "### 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ inputs.deploy_environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**URL:** ${{ steps.deploy-to-webapp.outputs.webapp-url }}" >> $GITHUB_STEP_SUMMARY
+
+  deploy-to-prod:
+    runs-on: ubuntu-latest
+    needs: deploy-to-clean-room
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: PROD
+    steps:
+    - name: Setup JFrog CLI
+      uses: jfrog/setup-jfrog-cli@v4
+      env:
+        JF_URL: ${{ secrets.JF_URL }}
+        JF_USER: ${{ secrets.JF_USER }}
+        JF_PASSWORD: ${{ secrets.JF_PASSWORD }}
+      with:
+        disable-auto-build-publish: true
+        disable-job-summary: true
+    
+    - name: Download artifact from JFrog
+      run: |
+        jfrog rt download "gol/${{ github.run_number }}/*.jar" ./artifacts/ --flat
+    
+    - name: Deploy to Azure Web App
+      id: deploy-to-webapp
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: 'artifacts/*.jar'
+    
+    - name: Display Deployment URL
+      run: |
+        echo "::notice title=Deployment URL::Application deployed to ${{ steps.deploy-to-webapp.outputs.webapp-url }}"
+        echo "### 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ inputs.deploy_environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**URL:** ${{ steps.deploy-to-webapp.outputs.webapp-url }}" >> $GITHUB_STEP_SUMMARY
+
+  deploy-to-dr:
+    runs-on: ubuntu-latest
+    needs: deploy-to-prod
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: DR
+    steps:
+    - name: Setup JFrog CLI
+      uses: jfrog/setup-jfrog-cli@v4
+      env:
+        JF_URL: ${{ secrets.JF_URL }}
+        JF_USER: ${{ secrets.JF_USER }}
+        JF_PASSWORD: ${{ secrets.JF_PASSWORD }}
+      with:
+        disable-auto-build-publish: true
+        disable-job-summary: true
+    
+    - name: Download artifact from JFrog
+      run: |
+        jfrog rt download "gol/${{ github.run_number }}/*.jar" ./artifacts/ --flat
+    
+    - name: Deploy to Azure Web App
+      id: deploy-to-webapp
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        slot-name: dr
+        package: 'artifacts/*.jar'
+    
+    - name: Display Deployment URL
+      run: |
+        echo "::notice title=Deployment URL::Application deployed to ${{ steps.deploy-to-webapp.outputs.webapp-url }}"
+        echo "### 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ inputs.deploy_environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**URL:** ${{ steps.deploy-to-webapp.outputs.webapp-url }}" >> $GITHUB_STEP_SUMMARY
+        

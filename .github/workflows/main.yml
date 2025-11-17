@@ -1,9 +1,7 @@
-name: Java CI with Maven
+name: Java CD with Maven
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
     branches: [ main ]
 
 jobs:
@@ -33,66 +31,9 @@ jobs:
       run: |
         jfrog rt upload "target/*.jar" "gol/${{ github.run_number }}/" --build-name=petclinic --build-number=${{ github.run_number }}
 
-  # sonar-scan:
-  #   name: Build and analyze
-  #   runs-on: ubuntu-latest
-  #   needs: build
-  #   steps:
-  #     - uses: actions/checkout@v5
-  #       with:
-  #         fetch-depth: 0
-
-  #     - name: Sonar Maven Scan
-  #       env:
-  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  #       run: |
-  #         mvn verify sonar:sonar \
-  #           -Dsonar.projectKey=CDSL-Canarys_game-of-life \
-  #           -Dsonar.organization=cdsl-canarys \
-  #           -Dsonar.host.url=https://sonarcloud.io \
-  #           -Dsonar.login=${{ secrets.SONAR_TOKEN }}
-
-  # codeql:
-  #   name: CodeQL Security Scanning
-  #   runs-on: ubuntu-latest
-  #   needs: sonar-scan
-  #   permissions:
-  #     actions: read
-  #     contents: read
-  #     security-events: write
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       language: [ 'java' ]
-  #   steps:
-  #   - name: Checkout repository
-  #     uses: actions/checkout@v5
-    
-  #   - name: Setup Java JDK
-  #     uses: actions/setup-java@v5.0.0
-  #     with:
-  #       java-version: '17'
-  #       distribution: 'temurin'
-  #       cache: 'maven'
-    
-  #   - name: Initialize CodeQL
-  #     uses: github/codeql-action/init@v4
-  #     with:
-  #       languages: ${{ matrix.language }}
-    
-  #   - name: Build with Maven
-  #     run: ./mvnw -B package -DskipTests
-    
-  #   - name: Perform CodeQL Analysis
-  #     uses: github/codeql-action/analyze@v4
-  #     with:
-  #       category: "/language:${{matrix.language}}"
-
   deploy-to-dev:
     runs-on: ubuntu-latest
-    # needs: [build, sonar-scan, codeql]
     needs: [build]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: DEV
     steps:
     - name: Setup JFrog CLI
@@ -128,7 +69,6 @@ jobs:
   deploy-to-uat:
     runs-on: ubuntu-latest
     needs: [deploy-to-dev]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: UAT
     steps:
     - name: Setup JFrog CLI
@@ -170,7 +110,6 @@ jobs:
   deploy-to-mock:
     runs-on: ubuntu-latest
     needs: deploy-to-uat
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: MOCK
     steps:
     - name: Setup JFrog CLI
@@ -212,7 +151,6 @@ jobs:
   deploy-to-clean-room:
     runs-on: ubuntu-latest
     needs: deploy-to-mock
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: CLEAN-ROOM
     steps:
     - name: Setup JFrog CLI
@@ -248,7 +186,6 @@ jobs:
   deploy-to-prod:
     runs-on: ubuntu-latest
     needs: deploy-to-clean-room
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: PROD
     steps:
     - name: Setup JFrog CLI
@@ -283,7 +220,6 @@ jobs:
   deploy-to-dr:
     runs-on: ubuntu-latest
     needs: deploy-to-prod
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: DR
     steps:
     - name: Setup JFrog CLI

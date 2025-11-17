@@ -1,0 +1,51 @@
+name: Java CI with Maven
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    
+    - name: Setup Java JDK
+      uses: actions/setup-java@v5.0.0
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: 'maven'
+    
+    - name: Build with Maven
+      run: ./mvnw -B package --file pom.xml
+    
+    - name: Setup JFrog CLI
+      uses: jfrog/setup-jfrog-cli@v4
+      env:
+        JF_URL: ${{ secrets.JF_URL }}
+        JF_USER: ${{ secrets.JF_USER }}
+        JF_PASSWORD: ${{ secrets.JF_PASSWORD }}
+    
+    # - name: Upload to JFrog Artifactory
+    #   run: |
+    #     jfrog rt upload "target/*.jar" "gol/${{ github.run_number }}/" --build-name=petclinic --build-number=${{ github.run_number }}
+
+  sonar-scan:
+    name: Build and analyze
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Sonar Maven Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          mvn verify sonar:sonar \
+            -Dsonar.projectKey=CDSL-Canarys_game-of-life \
+            -Dsonar.organization=cdsl-canarys \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}

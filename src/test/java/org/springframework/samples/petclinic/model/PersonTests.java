@@ -27,9 +27,12 @@ class PersonTests {
 
 	private Person person;
 
-	// Create a concrete implementation of Person for testing since it's abstract (MappedSuperclass)
+	// Create a concrete implementation of Person for testing since it's abstract
+	// (MappedSuperclass)
 	private static class TestPerson extends Person {
+
 		// No additional implementation needed
+
 	}
 
 	@BeforeEach

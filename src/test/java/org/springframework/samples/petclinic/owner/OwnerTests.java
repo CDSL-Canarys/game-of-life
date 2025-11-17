@@ -149,7 +149,8 @@ class OwnerTests {
 		Pet pet = new Pet();
 		pet.setId(1);
 		pet.setName("Max");
-		owner.getPets().add(pet); // Direct add to list since addPet won't add pets with IDs
+		owner.getPets().add(pet); // Direct add to list since addPet won't add pets with
+									// IDs
 
 		Pet foundPet = owner.getPet(1);
 

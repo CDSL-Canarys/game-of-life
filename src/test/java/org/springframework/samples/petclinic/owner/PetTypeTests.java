@@ -86,7 +86,7 @@ class PetTypeTests {
 
 	@Test
 	void testPetTypeWithCommonNames() {
-		String[] commonPetTypes = {"dog", "cat", "bird", "hamster", "lizard", "snake"};
+		String[] commonPetTypes = { "dog", "cat", "bird", "hamster", "lizard", "snake" };
 
 		for (String type : commonPetTypes) {
 			PetType pt = new PetType();

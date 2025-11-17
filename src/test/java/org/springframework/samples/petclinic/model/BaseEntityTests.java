@@ -26,6 +26,7 @@ class BaseEntityTests {
 
 	// Create a concrete implementation for testing
 	private static class TestEntity extends BaseEntity {
+
 	}
 
 	@Test

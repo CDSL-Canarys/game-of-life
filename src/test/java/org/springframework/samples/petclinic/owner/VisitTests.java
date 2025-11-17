@@ -48,8 +48,9 @@ class VisitTests {
 	}
 
 	@Test
-	void testDateIsNullInitially() {
-		assertThat(visit.getDate()).isNull();
+	void testDateIsInitializedToToday() {
+		// Visit constructor sets date to current date by default
+		assertThat(visit.getDate()).isEqualTo(LocalDate.now());
 	}
 
 	@Test
@@ -97,8 +98,8 @@ class VisitTests {
 
 	@Test
 	void testDescriptionCanBeLong() {
-		String longDescription = "This is a very long description that contains many details about the visit " +
-			"including symptoms, diagnosis, treatment plan, and follow-up recommendations.";
+		String longDescription = "This is a very long description that contains many details about the visit "
+				+ "including symptoms, diagnosis, treatment plan, and follow-up recommendations.";
 		visit.setDescription(longDescription);
 		assertThat(visit.getDescription()).isEqualTo(longDescription);
 	}

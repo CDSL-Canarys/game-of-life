@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PetTests {
 
 	private Pet pet;
+
 	private PetType petType;
 
 	@BeforeEach

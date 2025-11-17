@@ -60,8 +60,7 @@ class VetRepositoryTests {
 		Collection<Vet> vets = vetRepository.findAll();
 
 		// At least one vet should have specialties
-		boolean hasVetWithSpecialty = vets.stream()
-			.anyMatch(vet -> vet.getNrOfSpecialties() > 0);
+		boolean hasVetWithSpecialty = vets.stream().anyMatch(vet -> vet.getNrOfSpecialties() > 0);
 
 		assertThat(hasVetWithSpecialty).isTrue();
 	}

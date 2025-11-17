@@ -86,7 +86,7 @@ class SpecialtyTests {
 
 	@Test
 	void testCommonSpecialties() {
-		String[] commonSpecialties = {"radiology", "surgery", "dentistry", "cardiology", "dermatology"};
+		String[] commonSpecialties = { "radiology", "surgery", "dentistry", "cardiology", "dermatology" };
 
 		for (String spec : commonSpecialties) {
 			Specialty s = new Specialty();
